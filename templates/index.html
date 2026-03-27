@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Women Safety System</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<h1>🚨 Women Safety System</h1>
+
+<h2>Register</h2>
+<input id="name" placeholder="Name">
+<input id="id" placeholder="ID">
+<button onclick="register()">Register</button>
+
+<h2>Verify</h2>
+<input id="searchId" placeholder="Enter ID">
+<button onclick="verify()">Verify</button>
+
+<div id="result"></div>
+
+<h2>Report Person</h2>
+<input id="reportId" placeholder="Enter ID">
+<button onclick="report()">Report</button>
+
+<h2>SOS</h2>
+<button onclick="sos()">Send SOS 🚨</button>
+
+<script>
+function register() {
+  fetch('/register', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      name: document.getElementById('name').value,
+      id: document.getElementById('id').value
+    })
+  }).then(res => res.json()).then(data => alert(data.message));
+}
+
+function verify() {
+  let id = document.getElementById('searchId').value;
+  fetch('/verify/' + id)
+    .then(res => res.json())
+    .then(data => {
+      if(data.error){
+        document.getElementById('result').innerHTML = "❌ Not Found";
+      } else {
+        document.getElementById('result').innerHTML =
+          `Name: ${data.name} <br>
+           Verified: ${data.verified ? "✅" : "❌"} <br>
+           Risk: ${data.risk}`;
+      }
+    });
+}
+
+function report() {
+  let id = document.getElementById('reportId').value;
+  fetch('/report/' + id, {method: 'POST'})
+    .then(res => res.json())
+    .then(data => alert(data.message));
+}
+
+function sos() {
+  navigator.geolocation.getCurrentPosition(pos => {
+    alert(`🚨 SOS SENT!\nLat: ${pos.coords.latitude}, Lon: ${pos.coords.longitude}`);
+  });
+}
+</script>
+
+</body>
+</html>
