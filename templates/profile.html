@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/static/style.css">
+    <title>Worker Profile | Shield</title>
+</head>
+<body>
+    <div class="glass-card" style="text-align: center;">
+        <span class="badge" style="background: var(--pink-glow); color: var(--pink); margin-bottom: 10px;">Worker Identity</span>
+        <h1 style="margin: 0 0 20px 0; font-size: 32px;">Welcome, {{ user }}</h1>
+        
+        <div style="background: rgba(236, 72, 153, 0.05); padding: 30px; border-radius: 20px; border: 2px dashed var(--pink); margin-bottom: 30px;">
+            <p style="color: var(--text-muted); font-size: 12px; margin-top: 0;">YOUR PERMANENT SHIELD ID</p>
+            <h2 style="font-size: 40px; margin: 0; color: white; letter-spacing: 6px;">{{ sid }}</h2>
+        </div>
+
+        <div style="display: flex; justify-content: space-around; margin-bottom: 30px;">
+            <div>
+                <p style="color: var(--text-muted); font-size: 12px; margin:0;">SERVICE</p>
+                <p style="font-weight: 600;">{{ cat }}</p>
+            </div>
+            <div>
+                <p style="color: var(--text-muted); font-size: 12px; margin:0;">RATING</p>
+                <p style="font-weight: 600; color: #fbbf24;">⭐ {{ avg }} / 5</p>
+            </div>
+        </div>
+
+        <div style="text-align: left;">
+            <h3 style="font-size: 16px; margin-bottom: 15px;">Community Feedback</h3>
+            <div style="max-height: 200px; overflow-y: auto; padding-right: 5px;">
+                {% for r in reviews %}
+                <div style="background: rgba(255,255,255,0.03); padding: 15px; border-radius: 12px; border-left: 3px solid {% if r[2]=='High Risk' %}var(--red){% else %}var(--pink){% endif %}; margin-bottom: 10px;">
+                    <div style="display:flex; justify-content:space-between; font-size: 11px;">
+                        <span style="font-weight: 700;">{{ r[2] }}</span>
+                        <span>⭐ {{ r[0] }}</span>
+                    </div>
+                    <p style="margin: 5px 0 0 0; font-size: 13px; color: var(--text-muted);">"{{ r[1] }}"</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <button onclick="window.location.href='/logout'" class="btn-outline" style="margin-top: 30px;">Logout Portal</button>
+    </div>
+</body>
+</html>

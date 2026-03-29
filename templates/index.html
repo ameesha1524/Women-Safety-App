@@ -1,72 +1,61 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Women Safety System</title>
-  <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css">
+    <title>Shield | Secure Access</title>
 </head>
 <body>
+    <div class="glass-card">
+        <div style="text-align: center; margin-bottom: 30px;">
+            <div style="font-size: 40px; margin-bottom: 10px;">🛡️</div>
+            <h1 style="color: var(--pink); margin: 0; font-size: 28px;">SHIELD</h1>
+            <p style="color: var(--text-muted); font-size: 14px;">Identity & Safety Network</p>
+        </div>
 
-<h1>🚨 Women Safety System</h1>
+        {% if error %}<div class="alert alert-error">{{error}}</div>{% endif %}
+        {% if success %}<div class="alert alert-success">{{success}}</div>{% endif %}
 
-<h2>Register</h2>
-<input id="name" placeholder="Name">
-<input id="id" placeholder="ID">
-<button onclick="register()">Register</button>
+        <div id="login-box" class="{% if mode == 'signup' %}hidden{% endif %}">
+            <form action="/login" method="POST">
+                <label style="font-size: 11px; color: var(--text-muted);">USERNAME</label>
+                <input name="username" placeholder="e.g. himali_99" required>
+                <label style="font-size: 11px; color: var(--text-muted);">PASSWORD</label>
+                <input type="password" name="password" placeholder="••••••••" required>
+                <button type="submit" class="btn-pink">Sign In</button>
+            </form>
+            <p style="text-align: center; font-size: 14px; color: var(--text-muted); margin-top: 25px;">
+                New here? <a href="javascript:void(0)" onclick="toggle()" style="color: var(--pink); font-weight: 600;">Create Account</a>
+            </p>
+        </div>
 
-<h2>Verify</h2>
-<input id="searchId" placeholder="Enter ID">
-<button onclick="verify()">Verify</button>
+        <div id="signup-box" class="{% if mode != 'signup' %}hidden{% endif %}">
+            <form action="/signup" method="POST">
+                <input name="username" placeholder="Choose Unique Username" required>
+                <input type="password" name="password" placeholder="Create Password" required>
+                <select name="role" id="roleSelect" onchange="showWorkerOptions()">
+                    <option value="client">I am a Client (Woman)</option>
+                    <option value="worker">I am a Service Worker</option>
+                </select>
+                <div id="worker-opt" class="hidden">
+                    <input name="category" placeholder="Service (Uber, Delivery, etc.)">
+                </div>
+                <button type="submit" class="btn-pink">Register Account</button>
+            </form>
+            <p style="text-align: center; font-size: 14px; color: var(--text-muted); margin-top: 25px;">
+                Have an account? <a href="javascript:void(0)" onclick="toggle()" style="color: var(--pink); font-weight: 600;">Log In</a>
+            </p>
+        </div>
+    </div>
 
-<div id="result"></div>
-
-<h2>Report Person</h2>
-<input id="reportId" placeholder="Enter ID">
-<button onclick="report()">Report</button>
-
-<h2>SOS</h2>
-<button onclick="sos()">Send SOS 🚨</button>
-
-<script>
-function register() {
-  fetch('/register', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      name: document.getElementById('name').value,
-      id: document.getElementById('id').value
-    })
-  }).then(res => res.json()).then(data => alert(data.message));
-}
-
-function verify() {
-  let id = document.getElementById('searchId').value;
-  fetch('/verify/' + id)
-    .then(res => res.json())
-    .then(data => {
-      if(data.error){
-        document.getElementById('result').innerHTML = "❌ Not Found";
-      } else {
-        document.getElementById('result').innerHTML =
-          `Name: ${data.name} <br>
-           Verified: ${data.verified ? "✅" : "❌"} <br>
-           Risk: ${data.risk}`;
-      }
-    });
-}
-
-function report() {
-  let id = document.getElementById('reportId').value;
-  fetch('/report/' + id, {method: 'POST'})
-    .then(res => res.json())
-    .then(data => alert(data.message));
-}
-
-function sos() {
-  navigator.geolocation.getCurrentPosition(pos => {
-    alert(`🚨 SOS SENT!\nLat: ${pos.coords.latitude}, Lon: ${pos.coords.longitude}`);
-  });
-}
-</script>
-
+    <script>
+        function toggle() {
+            document.getElementById('login-box').classList.toggle('hidden');
+            document.getElementById('signup-box').classList.toggle('hidden');
+        }
+        function showWorkerOptions() {
+            const role = document.getElementById('roleSelect').value;
+            document.getElementById('worker-opt').className = role === 'worker' ? '' : 'hidden';
+        }
+    </script>
 </body>
 </html>

@@ -1,11 +1,13 @@
 from flask import Flask, render_template, request, redirect, session, jsonify
 import sqlite3
+import random
+import string
 from textblob import TextBlob
 
 app = Flask(__name__)
-app.secret_key = "secret123"
+app.secret_key = "shield_final_version_ultra"
 
-# 100 RED FLAGS: Behavioral and situational triggers for safety analysis [cite: 61]
+# RESTORED: ALL 100 RED FLAG WORDS FOR ML ANALYSIS
 RED_FLAGS = [
     "uneasy", "staring", "lingered", "aggressive", "uncomfortable", "forced", "looking around",
     "loitering", "nervous", "shifty", "evasive", "intimidating", "prying", "peeking",
@@ -24,181 +26,112 @@ RED_FLAGS = [
     "hiding face", "avoiding camera", "security", "alarm", "sensors", "disabled", "tampered"
 ]
 
-# ---------------- DATABASE ----------------
 def init_db():
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users (username TEXT, password TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS helpers (id TEXT, name TEXT, category TEXT, visits INTEGER, risk TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS ratings (helper_id TEXT, username TEXT, rating INTEGER, review TEXT)''')
+    # Ensure tables match our 5-column logic
+    c.execute('''CREATE TABLE IF NOT EXISTS users 
+                 (username TEXT PRIMARY KEY, password TEXT, role TEXT, shield_id TEXT, category TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS ratings 
+                 (helper_id TEXT, username TEXT, rating INTEGER, review TEXT, risk_status TEXT)''')
     conn.commit()
     conn.close()
 
 init_db()
 
-# ---------------- AI RISK LOGIC (NLP + STATS) ----------------
-def update_helper_risk(helper_id):
+def analyze_risk(review_text, stars):
+    review_text = review_text.lower()
+    sentiment = TextBlob(review_text).sentiment.polarity
+    # AI logic: If star rating is low OR red flag word found OR sentiment is negative
+    if any(word in review_text for word in RED_FLAGS) or sentiment < -0.3 or stars <= 2:
+        return "High Risk"
+    elif stars == 3:
+        return "Suspicious"
+    return "Verified Safe"
+
+@app.route('/')
+def index():
+    return render_template('index.html', mode="login")
+
+@app.route('/signup', methods=['POST'])
+def signup():
+    username = request.form.get('username').lower().strip()
+    password = request.form.get('password')
+    role = request.form.get('role')
+    category = request.form.get('category', 'N/A')
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
-    
-    # Get all reviews and ratings for the helper [cite: 61]
-    c.execute("SELECT rating, review FROM ratings WHERE helper_id=?", (helper_id,))
-    reviews = c.fetchall()
-    
-    if not reviews:
-        return "Unrated", 0
-
-    total_ratings = len(reviews)
-    avg_rating = sum([r[0] for r in reviews]) / total_ratings
-    
-    # NLP Behavioral Scan [cite: 60, 83]
-    ai_flagged = False
-    for r in reviews:
-        review_text = r[1].lower()
-        analysis = TextBlob(review_text)
-        
-        # Check for 100 Red-Flag keywords or highly negative sentiment 
-        if any(flag in review_text for flag in RED_FLAGS) or analysis.sentiment.polarity < -0.4:
-            ai_flagged = True
-            break
-
-    # Final Risk Classification [cite: 62, 87]
-    if ai_flagged:
-        risk = "High Risk"  # AI Behavioral override [cite: 144]
-    elif avg_rating >= 4.0:
-        risk = "Verified Safe"
-    elif avg_rating >= 2.5:
-        risk = "Suspicious"
-    else:
-        risk = "High Risk"
-
-    c.execute("UPDATE helpers SET risk=? WHERE id=?", (risk, helper_id))
-    conn.commit()
-    conn.close()
-    return risk, avg_rating
-
-# ---------------- ROUTES ----------------
-@app.route('/')
-def home():
-    return render_template('login.html')
+    try:
+        # Generate permanent ID for workers
+        sid = "SH-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=4)) if role == 'worker' else None
+        c.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?)", (username, password, role, sid, category))
+        conn.commit()
+        return render_template('index.html', success="Signup successful! Please Sign In.", mode="login")
+    except:
+        return render_template('index.html', error="Username taken!", mode="signup")
+    finally:
+        conn.close()
 
 @app.route('/login', methods=['POST'])
 def login():
-    data = request.form
+    username = request.form.get('username').lower().strip()
+    password = request.form.get('password')
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE username=? AND password=?", (data['username'], data['password']))
+    c.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
     user = c.fetchone()
-    
-    if not user:
-        c.execute("INSERT INTO users VALUES (?, ?)", (data['username'], data['password']))
-        conn.commit()
-        user = (data['username'], data['password'])
-
     conn.close()
-    session['user'] = user[0]
-    return redirect('/dashboard')
-
-@app.route('/logout')
-def logout():
-    session.pop('user', None)
-    return redirect('/')
+    if user:
+        session['user'], session['role'], session['sid'], session['cat'] = user[0], user[2], user[3], user[4]
+        return redirect('/profile' if user[2] == 'worker' else '/dashboard')
+    return render_template('index.html', error="Invalid Login.", mode="login")
 
 @app.route('/dashboard')
 def dashboard():
-    if 'user' not in session:
-        return redirect('/')
+    if session.get('role') != 'client': return redirect('/')
+    return render_template('dashboard.html', user=session['user'])
 
+@app.route('/profile')
+def profile():
+    if session.get('role') != 'worker': return redirect('/')
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM helpers")
-    total = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM helpers WHERE risk='High Risk'")
-    risky = c.fetchone()[0]
+    c.execute("SELECT rating, review, risk_status FROM ratings WHERE helper_id=?", (session['sid'],))
+    reviews = c.fetchall()
+    avg = round(sum([r[0] for r in reviews])/len(reviews), 1) if reviews else 0
     conn.close()
+    return render_template('profile.html', user=session['user'], sid=session['sid'], cat=session['cat'], reviews=reviews, avg=avg)
 
-    return render_template('dashboard.html', total=total, risky=risky, user=session['user'])
+@app.route('/verify/<sid>')
+def verify(sid):
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    c.execute("SELECT username, category FROM users WHERE shield_id=?", (sid.upper(),))
+    worker = c.fetchone()
+    if worker:
+        c.execute("SELECT rating, review, risk_status FROM ratings WHERE helper_id=?", (sid.upper(),))
+        ratings = c.fetchall()
+        status = "Verified Safe"
+        if any(r[2] == "High Risk" for r in ratings): status = "High Risk"
+        avg = round(sum([r[0] for r in ratings])/len(ratings), 1) if ratings else 0
+        return jsonify({"exists": True, "name": worker[0], "category": worker[1], "status": status, "rating": avg})
+    return jsonify({"exists": False})
 
-@app.route('/add_helper', methods=['POST'])
-def add_helper():
+@app.route('/rate', methods=['POST'])
+def rate():
     data = request.json
+    risk = analyze_risk(data['review'], int(data['rating']))
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
-    
-    c.execute("SELECT * FROM helpers WHERE id=?", (data['id'],))
-    if c.fetchone():
-        return jsonify({"error": "Helper ID already exists!"})
-
-    risk = "Unrated"
-    c.execute("INSERT INTO helpers VALUES (?, ?, ?, ?, ?)", (data['id'], data['name'], data['category'], data['visits'], risk))
-    c.execute("INSERT INTO logs(message) VALUES (?)", (f"New helper {data['name']} registered.",))
+    c.execute("INSERT INTO ratings VALUES (?, ?, ?, ?, ?)", (data['sid'].upper(), session['user'], data['rating'], data['review'], risk))
     conn.commit()
     conn.close()
-    return jsonify({"risk": risk, "message": "Helper registered successfully!"})
+    return jsonify({"message": f"Report Logged. AI Status: {risk}"})
 
-@app.route('/verify/<id>')
-def verify(id):
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    c.execute("SELECT * FROM helpers WHERE id=?", (id,))
-    h = c.fetchone()
-
-    if h:
-        c.execute("SELECT AVG(rating), COUNT(rating) FROM ratings WHERE helper_id=?", (id,))
-        rating_data = c.fetchone()
-        avg_rating = round(rating_data[0], 1) if rating_data[0] else "N/A"
-        total_reviews = rating_data[1]
-        conn.close()
-        
-        return jsonify({
-            "exists": True,
-            "name": h[1],
-            "category": h[2],
-            "visits": h[3],
-            "risk": h[4],
-            "rating": avg_rating,
-            "total_reviews": total_reviews
-        })
-
-    conn.close()
-    return jsonify({"exists": False, "error": "Unauthorized Entity: ID not found "})
-
-@app.route('/rate_helper', methods=['POST'])
-def rate_helper():
-    if 'user' not in session:
-        return jsonify({"error": "Unauthorized"})
-        
-    data = request.json
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    
-    c.execute("SELECT * FROM helpers WHERE id=?", (data['id'],))
-    if not c.fetchone():
-        return jsonify({"error": "Helper ID not found."})
-
-    c.execute("INSERT INTO ratings VALUES (?, ?, ?, ?)", 
-              (data['id'], session['user'], data['rating'], data['review']))
-    conn.commit()
-    
-    # Recalculate risk using AI sentiment analysis [cite: 62]
-    new_risk, avg = update_helper_risk(data['id'])
-    
-    c.execute("INSERT INTO logs(message) VALUES (?)", (f"Incident logged for {data['id']}. Risk: {new_risk}",))
-    conn.commit()
-    conn.close()
-
-    return jsonify({"message": f"Rating recorded. AI Status: {new_risk}"})
-
-@app.route('/alert', methods=['POST'])
-def alert():
-    data = request.json
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    c.execute("INSERT INTO logs(message) VALUES (?)", (f"CRITICAL: SOS Alert from {session.get('user')} at {data.get('lat')}, {data.get('lon')}",))
-    conn.commit()
-    conn.close()
-    return jsonify({"message": "Emergency alert broadcasted to contacts! 🚨 [cite: 122]"})
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/')
 
 if __name__ == '__main__':
     app.run(debug=True)

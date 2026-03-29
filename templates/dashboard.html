@@ -1,192 +1,72 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <link rel="stylesheet" href="/static/style.css">
-  <title>Dashboard | Shield Safety</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <title>Shield | Safety Dashboard</title>
 </head>
 <body>
+    <div class="glass-card" style="max-width: 600px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <h2 style="margin:0;">Safety Dashboard</h2>
+            <a href="/logout" style="color: var(--red); text-decoration: none; font-size: 14px; font-weight: 600;">Logout</a>
+        </div>
 
-  <nav class="sidebar">
-    <div class="sidebar-logo">
-      🛡️ SHIELD
+        <div style="background: rgba(255,255,255,0.03); padding: 25px; border-radius: 20px; border: 1px solid var(--border); margin-bottom: 30px;">
+            <h3 style="margin-top: 0; font-size: 16px;">Verify Identity</h3>
+            <input id="vid" placeholder="Enter Worker Shield ID (SH-XXXX)">
+            <button onclick="verify()" class="btn-pink">Run AI Safety Scan</button>
+            <div id="v-res" style="display:none; margin-top: 20px;"></div>
+        </div>
+
+        <h3 style="font-size: 16px;">Log Behavioral Report</h3>
+        <input id="rsid" placeholder="Worker Shield ID">
+        <select id="rstar">
+            <option value="5">⭐⭐⭐⭐⭐ Professional</option>
+            <option value="4">⭐⭐⭐⭐ Good</option>
+            <option value="3">⭐⭐⭐ Average</option>
+            <option value="2">⭐⭐ Suspicious</option>
+            <option value="1">⭐ High Risk</option>
+        </select>
+        <textarea id="rrev" rows="3" placeholder="Describe behavior (AI scans for 100+ Red Flags)..."></textarea>
+        <button onclick="rate()" class="btn-outline">Submit Community Log</button>
     </div>
-    <ul class="nav-menu">
-      <a href="/dashboard" class="nav-item active">📊 Dashboard</a>
-      <a href="#" class="nav-item">👥 Helper Database</a>
-      <a href="#" class="nav-item">⚠️ Incident Reports</a>
-      <a href="#" class="nav-item">⚙️ Settings</a>
-    </ul>
-    
-    <div style="margin-top: auto;">
-      <a href="/logout" class="nav-item" style="color: var(--danger-red);">🚪 Logout ({{user}})</a>
-    </div>
-  </nav>
 
-  <div class="main-wrapper">
-    
-    <header class="header">
-      <div>
-        <h1>Safety Overview</h1>
-        <p>Monitor community verifications and risk alerts in real-time.</p>
-      </div>
-    </header>
-
-    <div class="container">
-      
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-title">⬇️ Total Helpers Registered</div>
-          <div class="stat-value">{{total}}</div>
-          <div class="stat-trend trend-up">+12% from last month</div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-title">⬆️ High Risk Alerts</div>
-          <div class="stat-value">{{risky}}</div>
-          <div class="stat-trend trend-down">Requires Admin Review</div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-title">✅ System Status</div>
-          <div class="stat-value">Active</div>
-          <div class="stat-trend trend-up">All APIs operational</div>
-        </div>
-      </div>
-
-      <div class="grid">
-        
-        <div class="card">
-          <h2>Identity Verification</h2>
-          <p>Check a helper's risk status before granting access.</p>
-          <input id="vid" placeholder="Enter Helper ID (e.g., EMP101)">
-          <button onclick="verify()">Run Verification Scan</button>
-          <div id="result" class="result-box" style="display: none;"></div>
-        </div>
-
-        <div class="card">
-          <h2>Submit Community Rating</h2>
-          <p>Your feedback updates the global risk model.</p>
-          <input id="rate_id" placeholder="Helper ID">
-          <select id="rate_stars">
-            <option value="5">5 - Safe & Professional</option>
-            <option value="4">4 - Good</option>
-            <option value="3">3 - Average</option>
-            <option value="2">2 - Suspicious Behavior</option>
-            <option value="1">1 - High Risk / Danger</option>
-          </select>
-          <textarea id="rate_review" placeholder="Log incident details..." rows="2"></textarea>
-          <button onclick="rateHelper()" class="btn-pink">Submit Data</button>
-        </div>
-
-        <div class="card">
-          <h2>Register New Entity</h2>
-          <p>Add a new helper to the global database.</p>
-          <input id="hname" placeholder="Full Legal Name">
-          <input id="hid" placeholder="Official ID / Badge Number">
-          <input id="cat" placeholder="Category (e.g., Delivery, Utility)">
-          <input id="visits" type="number" placeholder="Initial Visit Count" value="1" style="display:none;">
-          <button onclick="addHelper()">Register to Database</button>
-        </div>
-
-        <div class="card" style="border-color: #451a1a; background-color: #1a0f0f;">
-          <h2 style="color: var(--danger-red);">Emergency Override</h2>
-          <p>Instantly broadcast location to local authorities and contacts.</p>
-          <button class="btn-red" onclick="sos()">🚨 TRIGGER SOS</button>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
-  <script>
-  // VERIFY HELPER 
-  function verify(){
-  const idInput = document.getElementById('vid').value;
-  if(!idInput) return alert("Please enter an ID to search.");
-
-  fetch('/verify/' + idInput)
-  .then(r => r.json()).then(d => {
-    const resBox = document.getElementById('result');
-    resBox.style.display = "block";
-    
-    if(!d.exists){
-      // IMPERSONATION ALERT
-      resBox.style.borderColor = "var(--danger-red)";
-      resBox.innerHTML = `
-        <div style="color:var(--danger-red); font-weight:700; margin-bottom:5px;">⚠️ UNAUTHORIZED ENTITY</div>
-        <p style="font-size:12px; margin:0;">This ID does not exist in our secure database. Do not grant access.</p>
-      `;
-    } else {
-      // HELPER FOUND
-      let riskColor = d.risk === "High Risk" ? "var(--danger-red)" : (d.risk === "Suspicious" ? "orange" : "var(--accent-green)");
-      resBox.style.borderColor = "var(--border-subtle)";
-      resBox.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <span style="font-weight:600; color:var(--text-primary);">${d.name}</span>
-          <span style="font-size:11px; padding:2px 8px; border-radius:10px; background:rgba(255,255,255,0.1);">${d.category}</span>
-        </div>
-        <div style="font-size:13px; color:var(--text-secondary); margin-bottom:10px;">
-          Rating: ⭐ ${d.rating} | Total Visits: ${d.visits}
-        </div>
-        <div style="padding:10px; background:rgba(255,255,255,0.03); border-radius:6px; text-align:center; border:1px solid ${riskColor}44;">
-          <span style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--text-secondary);">Safety Status</span><br>
-          <span style="color:${riskColor}; font-weight:800; font-size:16px;">${d.risk.toUpperCase()}</span>
-        </div>
-      `;
-    }
-  });
-}
-
-  // RATE HELPER 
-  function rateHelper(){
-   fetch('/rate_helper',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      id: document.getElementById('rate_id').value,
-      rating: parseInt(document.getElementById('rate_stars').value),
-      review: document.getElementById('rate_review').value
-    })
-   }).then(r=>r.json()).then(d=>{
-    alert(d.message || d.error);
-    if(!d.error) {
-      document.getElementById('rate_id').value = '';
-      document.getElementById('rate_review').value = '';
-    }
-   })
-  }
-
-  // ADD HELPER
-  function addHelper(){
-   fetch('/add_helper',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      name: document.getElementById('hname').value,
-      id: document.getElementById('hid').value,
-      category: document.getElementById('cat').value,
-      visits: 1
-    })
-   }).then(r=>r.json()).then(d=>{
-    alert(d.message || d.error);
-   })
-  }
-
-  // SOS
-  function sos(){
-   if(navigator.geolocation) {
-     navigator.geolocation.getCurrentPosition(p=>{
-      fetch('/alert',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({ lat: p.coords.latitude, lon: p.coords.longitude })
-      }).then(r=>r.json()).then(d=>alert("CRITICAL ALERT BROADCASTED."));
-     });
-   } else {
-     alert("Geolocation disabled.");
-   }
-  }
-  </script>
+    <script>
+        function verify() {
+            const sid = document.getElementById('vid').value;
+            fetch('/verify/' + sid).then(r => r.json()).then(d => {
+                const res = document.getElementById('v-res');
+                res.style.display = 'block';
+                if(d.exists) {
+                    const badgeClass = d.status === 'High Risk' ? 'risk-high' : 'risk-safe';
+                    res.innerHTML = `
+                        <div style="border-top: 1px solid var(--border); padding-top: 15px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span><b>${d.name.toUpperCase()}</b> (${d.category})</span>
+                                <span class="badge ${badgeClass}">${d.status}</span>
+                            </div>
+                            <p style="font-size:14px; color:var(--text-muted); margin: 5px 0;">Safety Score: ⭐ ${d.rating} / 5</p>
+                        </div>`;
+                } else {
+                    res.innerHTML = `<div class="alert alert-error">⚠️ UNKNOWN ID: DO NOT TRUST</div>`;
+                }
+            });
+        }
+        function rate() {
+            const data = {
+                sid: document.getElementById('rsid').value,
+                rating: document.getElementById('rstar').value,
+                review: document.getElementById('rrev').value
+            };
+            fetch('/rate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(r => r.json()).then(d => {
+                alert(d.message);
+                location.reload();
+            });
+        }
+    </script>
 </body>
 </html>
