@@ -2,71 +2,72 @@
 <html>
 <head>
     <link rel="stylesheet" href="/static/style.css">
-    <title>Shield | Secure Access</title>
+    <title>Shield | Identity & Safety</title>
 </head>
 <body>
-    <div class="glass-card">
-        <div style="text-align: center; margin-bottom: 30px;">
-            <div style="font-size: 40px; margin-bottom: 10px;">🛡️</div>
-            <h1 style="color: var(--pink); margin: 0; font-size: 28px;">SHIELD</h1>
-            <p style="color: var(--text-muted); font-size: 14px;">Identity & Safety Network</p>
-        </div>
+    <div class="auth-screen">
+        <div class="auth-card">
+            
+            <div style="margin-bottom: 35px;">
+                <div style="font-size: 40px; margin-bottom: 10px;">🛡️</div>
+                <h1 style="margin: 0; letter-spacing: 4px; color: var(--pink);">SHIELD</h1>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 5px;">Identity & Safety Network</p>
+            </div>
 
-        {% if error %}<div class="alert alert-error">{{error}}</div>{% endif %}
-        {% if success %}<div class="alert alert-success">{{success}}</div>{% endif %}
+            {% if error %}<div class="alert-error" style="padding:10px; margin-bottom:15px; border-radius:8px; background:rgba(239,68,68,0.1); color:#ef4444; font-size:13px;">{{ error }}</div>{% endif %}
+            {% if success %}<div class="alert-success" style="padding:10px; margin-bottom:15px; border-radius:8px; background:rgba(16,185,129,0.1); color:#10b981; font-size:13px;">{{ success }}</div>{% endif %}
 
-        <div id="login-box" class="{% if mode == 'signup' %}hidden{% endif %}">
+            {% if mode == "login" %}
             <form action="/login" method="POST">
-                <label style="font-size: 11px; color: var(--text-muted);">USERNAME</label>
-                <input name="username" placeholder="e.g. himali_99" required>
-                <label style="font-size: 11px; color: var(--text-muted);">PASSWORD</label>
-                <input type="password" name="password" placeholder="••••••••" required>
-                <button type="submit" class="btn-pink">Sign In</button>
+                <input type="text" name="username" placeholder="Username" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <button type="submit" class="btn-pink">Sign In to Command Center</button>
             </form>
-            <p style="text-align: center; font-size: 14px; color: var(--text-muted); margin-top: 25px;">
-                New here? <a href="javascript:void(0)" onclick="toggle()" style="color: var(--pink); font-weight: 600;">Create Account</a>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 25px;">
+                New to the network? <a href="javascript:void(0)" onclick="toggleMode('signup')" style="color: var(--pink); text-decoration: none;">Create Account</a>
             </p>
-        </div>
 
-        <div id="signup-box" class="{% if mode != 'signup' %}hidden{% endif %}">
+            {% else %}
             <form action="/signup" method="POST">
-                <input name="username" placeholder="Choose Unique Username" required>
+                <input type="text" name="username" placeholder="Choose Unique Username" required>
                 <input type="password" name="password" placeholder="Create Password" required>
-                <select name="role" id="roleSelect" onchange="showWorkerOptions()">
-                    <option value="client">I am a Client</option>
-                    <option value="worker">I am a Service Worker</option>
-                </select>
                 
-                <div id="client-opt">
-                    <input name="house_code" placeholder="Family Invite Code (Optional)" style="border-color: var(--pink);">
-                    <p style="font-size: 11px; color: var(--text-muted); margin-top: -10px; margin-bottom: 15px;">Leave blank to create a new household.</p>
+                <select name="role" id="role-select" onchange="updateForm()">
+                    <option value="client">I am a Client (Requesting Service)</option>
+                    <option value="worker">I am a Worker (Providing Service)</option>
+                </select>
+
+                <div id="client-fields">
+                    <input type="text" name="house_code" placeholder="Family Invite Code (Optional)">
+                    <p style="font-size: 10px; color: var(--text-muted); margin: -10px 0 15px 5px; text-align: left;">Leave blank to start a new household.</p>
                 </div>
 
-                <div id="worker-opt" class="hidden">
-                    <input name="category" placeholder="Service (Uber, Delivery, etc.)">
+                <div id="worker-fields" style="display: none;">
+                    <input type="text" name="category" placeholder="Service (Uber, Swiggy, Plumbing, etc.)">
                 </div>
-                
-                <button type="submit" class="btn-pink">Register Account</button>
+
+                <button type="submit" class="btn-pink">Register Secure Account</button>
             </form>
-            <p style="text-align: center; font-size: 14px; color: var(--text-muted); margin-top: 25px;">
-                Have an account? <a href="javascript:void(0)" onclick="toggle()" style="color: var(--pink); font-weight: 600;">Log In</a>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 25px;">
+                Already have an account? <a href="javascript:void(0)" onclick="toggleMode('login')" style="color: var(--pink); text-decoration: none;">Log In</a>
             </p>
+            {% endif %}
+
         </div>
-        
-        </div>
+    </div>
 
     <script>
-        function toggle() {
-            document.getElementById('login-box').classList.toggle('hidden');
-            document.getElementById('signup-box').classList.toggle('hidden');
+        function toggleMode(mode) {
+            window.location.href = (mode === 'signup') ? '/signup_page' : '/';
         }
-        
-        function showWorkerOptions() {
-            const role = document.getElementById('roleSelect').value;
-            // Toggle visibility based on the selected role
-            document.getElementById('worker-opt').className = role === 'worker' ? '' : 'hidden';
-            document.getElementById('client-opt').className = role === 'client' ? '' : 'hidden';
+
+        function updateForm() {
+            const role = document.getElementById('role-select').value;
+            document.getElementById('client-fields').style.display = (role === 'client') ? 'block' : 'none';
+            document.getElementById('worker-fields').style.display = (role === 'worker') ? 'block' : 'none';
         }
+
+        // Add this to your app.py to handle the signup_page route
     </script>
 </body>
 </html>

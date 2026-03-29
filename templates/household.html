@@ -1,0 +1,86 @@
+{% extends "layout.html" %}
+{% block page_title %}Household & Safety Circle{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 1fr 380px; gap: 30px;">
+    
+    <div>
+        <div class="glass-card" style="max-width: 100%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                <h3 style="margin:0;">Active Safety Circle</h3>
+                <span class="badge" style="background: rgba(16, 185, 129, 0.1); color: var(--green); border: 1px solid rgba(16, 185, 129, 0.2);">
+                    {{ members|length }} Connected Nodes
+                </span>
+            </div>
+
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 25px;">
+                Members in this circle share a live activity feed and receive immediate SOS overrides if a session timer expires.
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                {% for member in members %}
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 18px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="width: 40px; height: 40px; border-radius: 10px; background: #27272a; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #a1a1aa;">
+                            {{ member[0].upper() }}
+                        </div>
+                        <div>
+                            <div style="font-weight: 700; color: white;">{{ member }}</div>
+                            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">
+                                {% if member == session['user'] %}Primary Admin{% else %}Verified Member{% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if member != session['user'] %}
+                    <button class="btn-outline" style="width: auto; padding: 8px 16px; font-size: 11px; color: var(--red); border-color: rgba(239, 68, 68, 0.2);">
+                        Remove Access
+                    </button>
+                    {% else %}
+                    <span style="font-size: 11px; color: var(--pink); font-weight: 700;">YOU</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 30px;">
+        <div class="glass-card" style="max-width: 100%; border: 1px solid var(--pink-glow);">
+            <h3 style="color: var(--pink); margin-top: 0;">Invite Roommates</h3>
+            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.6;">
+                Anyone who signs up with this unique code will be automatically linked to your household safety network.
+            </p>
+
+            <div style="background: #000; border: 1px dashed var(--pink); padding: 25px; border-radius: 15px; text-align: center; margin: 20px 0; cursor: pointer;" 
+                 onclick="copyCode()" id="invite-box">
+                <span style="font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 5px;">HOUSEHOLD ENCRYPTION KEY</span>
+                <h2 style="margin:0; letter-spacing: 6px; color: white; font-family: monospace;" id="hcode">{{ house_code }}</h2>
+            </div>
+
+            <button class="btn-pink" onclick="copyCode()">Copy Invite Code</button>
+        </div>
+
+        <div class="glass-card" style="max-width: 100%; background: rgba(239, 68, 68, 0.03);">
+            <h4 style="margin-top: 0; color: var(--red); font-size: 14px;">Network Security</h4>
+            <p style="font-size: 11px; color: var(--text-muted);">
+                If you believe your house code has been compromised, contact support to generate a new master key.
+            </p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function copyCode() {
+    const code = document.getElementById('hcode').innerText;
+    navigator.clipboard.writeText(code);
+    
+    const box = document.getElementById('invite-box');
+    box.style.borderColor = "#10b981";
+    setTimeout(() => { box.style.borderColor = "var(--pink)"; }, 2000);
+    
+    alert("Invite code copied to clipboard!");
+}
+</script>
+{% endblock %}

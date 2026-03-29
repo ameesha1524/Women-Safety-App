@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <title>Shield | Command Center</title>
+    
+    <style>
+        /* 1. BASE DESKTOP LAYOUT */
+        * { box-sizing: border-box; }
+        body { 
+            display: flex; 
+            flex-direction: row; 
+            height: 100vh; 
+            width: 100vw;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; 
+            background: #09090b; 
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .sidebar {
+            width: 260px;
+            min-width: 260px;
+            background: #111113;
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 30px 20px;
+            z-index: 2000;
+        }
+
+        .nav-link {
+            padding: 14px 18px;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-link:hover { background: rgba(255,255,255,0.03); color: white; }
+        .nav-link.active { background: var(--pink-glow); color: var(--pink); }
+
+        .main-stage {
+            flex: 1;
+            height: 100vh;
+            overflow-y: auto;
+            background: #09090b;
+            position: relative; 
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header-bar {
+            padding: 30px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .page-content {
+            flex: 1;
+            padding: 0 40px 40px 40px;
+            width: 100%;
+            max-width: 1400px;
+        }
+
+        .full-bleed { padding: 0 !important; max-width: none !important; height: 100% !important; }
+
+        /* SOS OVERLAY ANIMATION */
+        @keyframes sos-blink {
+            0% { background: rgba(239, 68, 68, 0.95); }
+            50% { background: rgba(153, 27, 27, 0.95); }
+            100% { background: rgba(239, 68, 68, 0.95); }
+        }
+        .sos-active-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: 9999; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; color: white;
+            text-align: center; animation: sos-blink 1s infinite;
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div style="text-align: left; padding-left: 15px; margin-bottom: 40px;">
+            <h2 style="color: var(--pink); letter-spacing: 4px; font-size: 20px; margin: 0;">SHIELD</h2>
+            <p style="font-size: 10px; color: var(--text-muted); margin: 4px 0 0 0; letter-spacing: 1px;">NETWORK OPS</p>
+        </div>
+
+        <nav style="flex: 1;">
+            {% if session['role'] == 'client' %}
+                <a href="/dashboard" class="nav-link {% if request.path == '/dashboard' %}active{% endif %}">🏠 Dashboard</a>
+                <a href="/map" class="nav-link {% if request.path == '/map' %}active{% endif %}">📍 Safety Radar</a>
+                <a href="/household" class="nav-link {% if request.path == '/household' %}active{% endif %}">👨‍👩‍👧‍👦 Household</a>
+            {% else %}
+                <a href="/profile" class="nav-link {% if request.path == '/profile' %}active{% endif %}">👤 My Profile</a>
+                <a href="/worker/task" class="nav-link {% if request.path == '/worker/task' %}active{% endif %}">📦 Active Task</a>
+            {% endif %}
+        </nav>
+
+        <a href="/logout" class="nav-link" style="color: var(--red); margin-top: auto; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px;">
+            🚪 Exit System
+        </a>
+    </aside>
+
+    <main class="main-stage">
+        {% if request.path != '/map' %}
+        <div class="header-bar">
+            <h1 style="margin:0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
+                {% block page_title %}{% endblock %}
+            </h1>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div style="text-align: right;">
+                    <div style="font-size: 13px; font-weight: 700; color: white;">{{ session['user'] }}</div>
+                    <div style="font-size: 10px; color: var(--text-muted);">{{ session['role'].upper() }} NODE</div>
+                </div>
+                <div style="width: 35px; height: 35px; border-radius: 8px; background: var(--pink-glow); border: 1px solid var(--pink); display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--pink);">
+                    {{ session['user'][0].upper() }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="page-content {% if request.path == '/map' %}full-bleed{% endif %}">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+    <script>
+        // --- GLOBAL SOS LISTENER ---
+        function pollForSOS() {
+            fetch('/api/v1/check_sos')
+            .then(r => r.json())
+            .then(data => {
+                if (data.sos_active) {
+                    if (!document.getElementById('sos-alert-screen')) {
+                        const overlay = document.createElement('div');
+                        overlay.id = 'sos-alert-screen';
+                        overlay.className = 'sos-active-overlay';
+                        overlay.innerHTML = `
+                            <div style="font-size: 100px; margin-bottom: 20px;">🚨</div>
+                            <h1 style="font-size: 48px; font-weight: 900; margin: 0;">SOS ALERT</h1>
+                            <p style="font-size: 20px; margin: 20px 0 40px 0; opacity: 0.9;">
+                                <b>CRITICAL:</b> ${data.victims.join(', ')} has failed to check-in.<br>
+                                Emergency response required immediately.
+                            </p>
+                            <div style="display: flex; gap: 20px;">
+                                <button onclick="window.location.href='/map'" style="padding: 15px 40px; border-radius: 12px; border: none; background: white; color: #991b1b; font-weight: 800; cursor: pointer;">VIEW ON MAP</button>
+                                <button onclick="this.parentElement.parentElement.remove()" style="padding: 15px 40px; border-radius: 12px; border: 2px solid white; background: transparent; color: white; font-weight: 700; cursor: pointer;">DISMISS</button>
+                            </div>
+                        `;
+                        document.body.appendChild(overlay);
+                        
+                        // Play emergency tone
+                        const alarm = new Audio('https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg');
+                        alarm.play();
+                    }
+                }
+            })
+            .catch(err => console.log("Network Syncing..."));
+        }
+
+        // Only clients listen for household SOS alerts
+        {% if session['role'] == 'client' %}
+            setInterval(pollForSOS, 10000); 
+        {% endif %}
+
+        // --- SHARED TIMER FUNCTIONS ---
+        function startSafetyTimer() {
+            const mins = document.getElementById('timer-mins').value;
+            fetch('/api/v1/start_timer', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({minutes: mins})
+            }).then(() => alert("Dead Man's Switch Activated. Monitoring your session."));
+        }
+
+        function stopSafetyTimer() {
+            fetch('/api/v1/stop_timer', {method: 'POST'})
+            .then(() => alert("Timer cleared. You are marked as SAFE."));
+        }
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

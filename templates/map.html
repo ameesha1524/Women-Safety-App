@@ -1,0 +1,143 @@
+{% extends "layout.html" %}
+{% block page_title %}Geospatial Threat Intelligence{% endblock %}
+
+{% block content %}
+<style>
+    /* CRITICAL: Force the main area to be a full-screen workspace */
+    .main-stage { 
+        padding: 0 !important; 
+        margin: 0 !important; 
+        max-width: none !important; 
+        height: 100vh !important;
+        position: relative;
+        overflow: hidden !important;
+    }
+
+    /* The Map must be absolute to fill the parent Main Stage */
+    #big-map { 
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%; 
+        width: 100%; 
+        z-index: 1; 
+        background: #09090b;
+    }
+
+    /* Tactical Intel Sidebar Overlay */
+    .intel-sidebar {
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        bottom: 20px;
+        width: 350px;
+        background: rgba(18, 18, 20, 0.9);
+        backdrop-filter: blur(15px);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        z-index: 1000; /* Stays above map */
+        display: flex;
+        flex-direction: column;
+        padding: 25px;
+        box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+    }
+
+    .threat-item {
+        background: rgba(255,255,255,0.03);
+        border-left: 4px solid var(--pink);
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        font-size: 13px;
+        transition: 0.2s;
+    }
+    .threat-item:hover { background: rgba(255,255,255,0.06); }
+    .threat-item.high { border-left-color: var(--red); background: rgba(239, 68, 68, 0.05); }
+
+    /* Hide the default header bar on this page to maximize map view */
+    .header-bar { display: none !important; }
+</style>
+
+<div id="big-map"></div>
+
+<div class="intel-sidebar">
+    <h3 style="margin-top: 0; display: flex; justify-content: space-between; align-items: center; font-size: 18px;">
+        Live Intel Feed
+        <span class="badge risk-high" style="font-size: 10px; padding: 4px 8px;">LIVE</span>
+    </h3>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 10px; text-align: center; border-radius: 12px;">
+            <p style="font-size: 9px; color: var(--text-muted); margin: 0; text-transform: uppercase;">Active Threats</p>
+            <b id="count-threats" style="font-size: 20px;">0</b>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 10px; text-align: center; border-radius: 12px;">
+            <p style="font-size: 9px; color: var(--text-muted); margin: 0; text-transform: uppercase;">Node Status</p>
+            <b style="color: var(--green); font-size: 14px;">ENCRYPTED</b>
+        </div>
+    </div>
+
+    <div id="intel-feed" style="flex: 1; overflow-y: auto; padding-right: 5px;">
+        <p style="color: var(--text-muted); font-size: 12px; text-align: center; margin-top: 40px;">Syncing with Mesh Network...</p>
+    </div>
+
+    <button onclick="location.reload()" class="btn-outline" style="font-size: 12px; padding: 12px; margin-top: 15px; border-color: rgba(255,255,255,0.1);">
+        Refresh Command Center
+    </button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 1. Initialize Map
+    const map = L.map('big-map', { zoomControl: false }).setView([12.9165, 79.1325], 13);
+    
+    L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; CARTO'
+    }).addTo(map);
+
+    // 2. Fetch and Render
+    fetch('/api/v1/community_map')
+        .then(r => r.json())
+        .then(points => {
+            // Heatmap Layer
+            L.heatLayer(points, {
+                radius: 35, 
+                blur: 20, 
+                maxZoom: 15,
+                gradient: { 0.4: '#10b981', 0.7: '#fbbf24', 1.0: '#ef4444' }
+            }).addTo(map);
+
+            document.getElementById('count-threats').innerText = points.length;
+
+            const feed = document.getElementById('intel-feed');
+            feed.innerHTML = '';
+            
+            points.forEach((p) => {
+                const isHigh = p[2] === 1.0;
+                const status = isHigh ? 'HIGH ALERT' : 'SUSPICIOUS';
+                
+                feed.innerHTML += `
+                    <div class="threat-item ${isHigh ? 'high' : ''}">
+                        <div style="display:flex; justify-content:space-between; margin-bottom: 5px;">
+                            <b style="color: ${isHigh ? 'var(--red)' : 'var(--pink)'}; font-size: 11px;">${status}</b>
+                            <span style="font-size: 9px; color: var(--text-muted);">LAT: ${p[0].toFixed(3)}</span>
+                        </div>
+                        <div style="font-size: 12px; color: #fff;">Anonymized Incident Detected</div>
+                    </div>
+                `;
+            });
+
+            // CRITICAL FIX: Force Leaflet to re-detect the container size after CSS loads
+            setTimeout(() => { map.invalidateSize(); }, 500);
+        });
+
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(p => {
+            map.flyTo([p.coords.latitude, p.coords.longitude], 14);
+        });
+    }
+</script>
+{% endblock %}

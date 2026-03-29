@@ -2,43 +2,130 @@
 
 :root {
     --bg: #09090b;
-    --surface: rgba(18, 18, 20, 0.8);
+    --surface: rgba(18, 18, 20, 0.95);
     --border: rgba(39, 39, 42, 0.8);
     --pink: #ec4899;
-    --pink-glow: rgba(236, 72, 153, 0.3);
+    --pink-glow: rgba(236, 72, 153, 0.2);
     --green: #10b981;
     --red: #ef4444;
     --text: #fafafa;
     --text-muted: #a1a1aa;
 }
 
+/* 1. GLOBAL LAYOUT - Sidebar + Content Side-by-Side */
 body, html {
     height: 100%;
+    width: 100%;
     margin: 0;
     font-family: 'Inter', sans-serif;
-    background: radial-gradient(circle at top right, #18181b, #09090b);
+    background: var(--bg);
     color: var(--text);
+    display: flex;
+    flex-direction: row; /* Forces Sidebar and Main Stage to stay horizontal */
+    overflow: hidden;
+}
+
+/* 2. AUTH SCREEN (Login/Signup - Centers itself over the layout) */
+.auth-screen {
+    position: fixed;
+    inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow-x: hidden;
+    background: radial-gradient(circle at top right, #18181b, #09090b);
+    z-index: 5000;
 }
 
-/* Glassmorphism Card */
+.auth-card {
+    background: var(--surface);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    padding: 45px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    text-align: center;
+}
+
+/* 3. PERSISTENT SIDEBAR NAVIGATION */
+.sidebar {
+    width: 260px;
+    min-width: 260px;
+    height: 100vh;
+    background: #111113;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 30px 20px;
+    z-index: 2000;
+}
+
+.nav-link {
+    padding: 14px 18px;
+    color: var(--text-muted);
+    text-decoration: none;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.nav-link:hover {
+    background: rgba(255,255,255,0.03);
+    color: white;
+}
+
+.nav-link.active {
+    background: var(--pink-glow);
+    color: var(--pink);
+    border: 1px solid rgba(236, 72, 153, 0.2);
+}
+
+/* 4. MAIN STAGE (Scrollable content area) */
+.main-stage {
+    flex: 1;
+    height: 100vh;
+    overflow-y: auto;
+    position: relative;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.page-content {
+    padding: 40px;
+    flex: 1;
+}
+
+.full-bleed {
+    padding: 0 !important;
+}
+
+/* 5. COMPONENTS (Glassmorphism & Widgets) */
 .glass-card {
     background: var(--surface);
     backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--border);
     border-radius: 24px;
-    padding: 40px;
+    padding: 30px;
     width: 100%;
-    max-width: 450px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    margin-bottom: 25px;
 }
 
-h1, h2, h3 { font-weight: 800; letter-spacing: -0.025em; }
+.status-container {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    padding: 20px;
+    border-radius: 16px;
+    margin-bottom: 20px;
+}
 
+/* 6. INPUTS & BUTTONS */
 input, select, textarea {
     width: 100%;
     background: rgba(24, 24, 27, 0.8);
@@ -46,72 +133,70 @@ input, select, textarea {
     border-radius: 12px;
     padding: 14px;
     color: white;
-    font-size: 15px;
+    font-size: 14px;
     margin-bottom: 16px;
-    transition: all 0.2s;
     box-sizing: border-box;
-}
-
-input:focus {
-    border-color: var(--pink);
-    outline: none;
-    box-shadow: 0 0 0 4px var(--pink-glow);
-}
-
-button {
-    width: 100%;
-    padding: 14px;
-    border-radius: 12px;
-    border: none;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .btn-pink {
     background: var(--pink);
     color: white;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    font-weight: 700;
+    cursor: pointer;
     box-shadow: 0 4px 14px 0 var(--pink-glow);
-}
-
-.btn-pink:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px 0 var(--pink-glow);
 }
 
 .btn-outline {
     background: transparent;
     border: 1px solid var(--border);
     color: var(--text-muted);
+    padding: 14px;
+    border-radius: 12px;
+    cursor: pointer;
 }
 
-.btn-outline:hover {
-    border-color: var(--text);
-    color: var(--text);
+/* 7. EMERGENCY SOS OVERLAY & ANIMATION */
+@keyframes sos-blink {
+    0% { background: rgba(239, 68, 68, 0.95); }
+    50% { background: rgba(153, 27, 27, 0.95); }
+    100% { background: rgba(239, 68, 68, 0.95); }
 }
 
-.alert {
-    padding: 12px;
-    border-radius: 10px;
-    font-size: 14px;
-    margin-bottom: 20px;
-    text-align: center;
-    border: 1px solid transparent;
+.sos-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    animation: sos-blink 1s infinite;
+    backdrop-filter: blur(10px);
 }
 
-.alert-error { background: rgba(239, 68, 68, 0.1); color: var(--red); border-color: rgba(239, 68, 68, 0.2); }
-.alert-success { background: rgba(16, 185, 129, 0.1); color: var(--green); border-color: rgba(16, 185, 129, 0.2); }
+/* 8. WORKER SPECIFIC (Reveal Logic) */
+.locked-text {
+    font-family: 'Courier New', monospace;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+}
 
+.reveal-glow {
+    color: var(--green);
+    text-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+    font-weight: 800;
+}
+
+/* 9. BADGES */
 .badge {
-    display: inline-block;
     padding: 4px 12px;
     border-radius: 99px;
     font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
 }
-
 .risk-high { background: rgba(239, 68, 68, 0.1); color: var(--red); border: 1px solid var(--red); }
 .risk-safe { background: rgba(16, 185, 129, 0.1); color: var(--green); border: 1px solid var(--green); }
-
-.hidden { display: none; }

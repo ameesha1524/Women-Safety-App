@@ -1,46 +1,60 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <link rel="stylesheet" href="/static/style.css">
-    <title>Worker Profile | Shield</title>
-</head>
-<body>
-    <div class="glass-card" style="text-align: center;">
-        <span class="badge" style="background: var(--pink-glow); color: var(--pink); margin-bottom: 10px;">Worker Identity</span>
-        <h1 style="margin: 0 0 20px 0; font-size: 32px;">Welcome, {{ user }}</h1>
-        
-        <div style="background: rgba(236, 72, 153, 0.05); padding: 30px; border-radius: 20px; border: 2px dashed var(--pink); margin-bottom: 30px;">
-            <p style="color: var(--text-muted); font-size: 12px; margin-top: 0;">YOUR PERMANENT SHIELD ID</p>
-            <h2 style="font-size: 40px; margin: 0; color: white; letter-spacing: 6px;">{{ sid }}</h2>
-        </div>
+{% extends "layout.html" %}
+{% block page_title %}Worker Identity{% endblock %}
 
-        <div style="display: flex; justify-content: space-around; margin-bottom: 30px;">
-            <div>
-                <p style="color: var(--text-muted); font-size: 12px; margin:0;">SERVICE</p>
-                <p style="font-weight: 600;">{{ cat }}</p>
-            </div>
-            <div>
-                <p style="color: var(--text-muted); font-size: 12px; margin:0;">RATING</p>
-                <p style="font-weight: 600; color: #fbbf24;">⭐ {{ avg }} / 5</p>
-            </div>
-        </div>
-
-        <div style="text-align: left;">
-            <h3 style="font-size: 16px; margin-bottom: 15px;">Community Feedback</h3>
-            <div style="max-height: 200px; overflow-y: auto; padding-right: 5px;">
-                {% for r in reviews %}
-                <div style="background: rgba(255,255,255,0.03); padding: 15px; border-radius: 12px; border-left: 3px solid {% if r[2]=='High Risk' %}var(--red){% else %}var(--pink){% endif %}; margin-bottom: 10px;">
-                    <div style="display:flex; justify-content:space-between; font-size: 11px;">
-                        <span style="font-weight: 700;">{{ r[2] }}</span>
-                        <span>⭐ {{ r[0] }}</span>
-                    </div>
-                    <p style="margin: 5px 0 0 0; font-size: 13px; color: var(--text-muted);">"{{ r[1] }}"</p>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <button onclick="window.location.href='/logout'" class="btn-outline" style="margin-top: 30px;">Logout Portal</button>
+{% block content %}
+<div style="max-width: 900px; margin: 0 auto; text-align: center;">
+    
+    <div style="margin-bottom: 40px;">
+        <span class="badge" style="background: var(--pink-glow); color: var(--pink);">WORKER IDENTITY</span>
+        <h1 style="font-size: 48px; margin: 10px 0;">Welcome, {{ session['user'] }}</h1>
     </div>
-</body>
-</html>
+
+    <div style="border: 2px dashed var(--pink); border-radius: 24px; padding: 40px; margin-bottom: 40px; background: rgba(236, 72, 153, 0.02);">
+        <p style="font-size: 12px; color: var(--text-muted); letter-spacing: 2px; margin-bottom: 10px;">YOUR PERMANENT SHIELD ID</p>
+        <h1 style="font-size: 70px; margin: 0; letter-spacing: 8px; font-family: monospace;">{{ sid }}</h1>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 40px;">
+        <div class="glass-card" style="padding: 20px;">
+            <p style="font-size: 11px; color: var(--text-muted); margin: 0;">SERVICE</p>
+            <b style="font-size: 18px;">{{ cat }}</b>
+        </div>
+        <div class="glass-card" style="padding: 20px;">
+            <p style="font-size: 11px; color: var(--text-muted); margin: 0;">JOBS DONE</p>
+            <b style="font-size: 18px;">{{ total }}</b>
+        </div>
+        <div class="glass-card" style="padding: 20px;">
+            <p style="font-size: 11px; color: var(--text-muted); margin: 0;">RATING</p>
+            <b style="font-size: 18px; color: #fbbf24;">⭐ {{ avg }}</b>
+        </div>
+    </div>
+
+    <div class="glass-card" style="text-align: left; padding: 25px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 10px;">
+            <span>CERTIFICATION PROGRESS</span>
+            <span style="color: var(--text-muted);">{{ total }} / 50 Ratings</span>
+        </div>
+        <div style="height: 10px; background: #000; border-radius: 5px; overflow: hidden; border: 1px solid var(--border);">
+            <div style="width: {{ (total/50)*100 }}%; height: 100%; background: var(--pink); box-shadow: 0 0 10px var(--pink-glow);"></div>
+        </div>
+        <p style="font-size: 10px; color: var(--text-muted); margin-top: 10px; text-align: center;">
+            Reach 50 ratings with >4.5 average to unlock Certified Status.
+        </p>
+    </div>
+
+    <div style="text-align: left; margin-top: 50px;">
+        <h3 style="margin-bottom: 20px;">Recent Community Feedback</h3>
+        <div style="display: flex; flex-direction: column; gap: 15px;">
+            {% for r in reviews %}
+            <div style="background: var(--surface); border: 1px solid var(--border); padding: 20px; border-radius: 16px; border-left: 4px solid {% if r[2] == 'High Risk' %}var(--red){% else %}var(--pink){% endif %};">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <b style="font-size: 12px; color: {% if r[2] == 'High Risk' %}var(--red){% else %}var(--pink){% endif %};">{{ r[2] }}</b>
+                    <span style="color: #fbbf24; font-size: 13px;">⭐ {{ r[0] }}</span>
+                </div>
+                <p style="margin: 0; font-size: 14px; font-style: italic; color: var(--text-muted);">"{{ r[1] }}"</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
