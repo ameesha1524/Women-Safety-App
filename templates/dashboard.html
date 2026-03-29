@@ -3,12 +3,34 @@
 <head>
     <link rel="stylesheet" href="/static/style.css">
     <title>Shield | Safety Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 </head>
 <body>
     <div class="glass-card" style="max-width: 600px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
             <h2 style="margin:0;">Safety Dashboard</h2>
             <a href="/logout" style="color: var(--red); text-decoration: none; font-size: 14px; font-weight: 600;">Logout</a>
+        </div>
+
+        <div style="background: rgba(236, 72, 153, 0.05); padding: 20px; border-radius: 15px; border: 1px dashed var(--pink); margin-bottom: 25px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="margin: 0; font-size: 14px; color: var(--pink);">🏡 Household Feed</h3>
+                <span style="font-size: 12px; color: var(--text-muted);">Invite Code: <b>{{ house_code }}</b></span>
+            </div>
+            
+            {% if logs %}
+                <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px; color: var(--text-muted);">
+                {% for log in logs %}
+                    <li style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        👉 {{ log[0] }}
+                    </li>
+                {% endfor %}
+                </ul>
+            {% else %}
+                <p style="font-size: 12px; color: var(--text-muted); margin: 0;">No activity yet. Share your code to link roommates!</p>
+            {% endif %}
         </div>
 
         <div style="background: rgba(255,255,255,0.03); padding: 25px; border-radius: 20px; border: 1px solid var(--border); margin-bottom: 30px;">
@@ -28,7 +50,19 @@
             <option value="1">⭐ High Risk</option>
         </select>
         <textarea id="rrev" rows="3" placeholder="Describe behavior (AI scans for 100+ Red Flags)..."></textarea>
-        <button onclick="rate()" class="btn-outline">Submit Community Log</button>
+        <button id="rate-btn" onclick="rate()" class="btn-outline">Submit Community Log</button>
+
+        <div style="background: rgba(255,255,255,0.03); padding: 25px; border-radius: 20px; border: 1px solid var(--border); margin-top: 30px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; font-size: 16px;">📍 Community Safety Radar</h3>
+                <span class="badge" style="background: rgba(236, 72, 153, 0.2); color: var(--pink);">Live Network</span>
+            </div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">
+                Crowdsourced threat intelligence from your area. Red zones indicate high AI-flagged incidents.
+            </p>
+            
+            <div id="client-map" style="height: 300px; width: 100%; border-radius: 12px; z-index: 1;"></div>
+        </div>
     </div>
 
     <script>
@@ -52,21 +86,75 @@
                 }
             });
         }
+
         function rate() {
-            const data = {
-                sid: document.getElementById('rsid').value,
-                rating: document.getElementById('rstar').value,
-                review: document.getElementById('rrev').value
-            };
-            fetch('/rate', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            }).then(r => r.json()).then(d => {
-                alert(d.message);
-                location.reload();
-            });
+            if (!navigator.geolocation) {
+                alert("Geolocation is not supported by your browser.");
+                return;
+            }
+
+            const btn = document.getElementById('rate-btn'); 
+            if(btn) btn.innerText = "Capturing Location...";
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const data = {
+                        sid: document.getElementById('rsid').value,
+                        rating: document.getElementById('rstar').value,
+                        review: document.getElementById('rrev').value,
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+
+                    fetch('/rate', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(data)
+                    }).then(r => r.json()).then(d => {
+                        alert(d.message);
+                        location.reload();
+                    });
+                },
+                function(error) {
+                    alert("Error capturing location. Please enable location services to log a safety report.");
+                    if(btn) btn.innerText = "Submit Community Log";
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
         }
+
+        // --- MAP INITIALIZATION LOGIC ---
+        document.addEventListener("DOMContentLoaded", function() {
+            // Default center coordinates
+            let defaultLat = 12.9165;
+            let defaultLng = 79.1325;
+            
+            const clientMap = L.map('client-map').setView([defaultLat, defaultLng], 13);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; CARTO'
+            }).addTo(clientMap);
+
+            // Fetch the anonymized crowdsourced data
+            fetch('/api/v1/community_map')
+                .then(response => response.json())
+                .then(points => {
+                    L.heatLayer(points, {
+                        radius: 25,
+                        blur: 15,
+                        maxZoom: 15,
+                        gradient: { 0.2: '#10b981', 0.6: '#fbbf24', 1.0: '#ef4444' }
+                    }).addTo(clientMap);
+                })
+                .catch(err => console.error("Error loading community map:", err));
+
+            // Auto-center map on user's live location if they allow it
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    clientMap.setView([position.coords.latitude, position.coords.longitude], 14);
+                });
+            }
+        });
     </script>
 </body>
 </html>

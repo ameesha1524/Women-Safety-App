@@ -1,0 +1,32 @@
+{
+  "boundary_violations": [
+    "entered without permission", "walked right in", "refused to leave", "lingered", "snooping",
+    "upstairs", "bedroom", "closet", "bathroom", "prying", "peeking", "looking around", 
+    "would not step back", "pushed past", "blocked the door", "invaded personal space",
+    "followed me inside", "wandering", "off-limits", "testing handles", "checking locks",
+    "opened drawers", "asked to come in", "asking to use the bathroom"
+  ],
+  "inappropriate_behavior": [
+    "creepy", "weird", "uncomfortable", "staring", "leering", "inappropriate", "flirting",
+    "asked for my number", "asked if I live alone", "personal questions", "marital status",
+    "commented on my body", "winking", "kissing noises", "touching", "grabbed", "brushed against",
+    "too close", "heavy breathing", "whispering", "taking pictures", "recording", "filming"
+  ],
+  "aggression_and_hostility": [
+    "aggressive", "hostile", "angry", "yelling", "shouting", "screaming", "slammed", 
+    "banging on door", "threatening", "intimidating", "rude", "swearing", "cursing", 
+    "belligerent", "demanding", "threw", "kicked", "violent", "furious", "lost temper",
+    "refused to hand over", "arguing", "argued", "scary", "frightening"
+  ],
+  "impersonation_and_fraud": [
+    "different person", "didn't match photo", "wrong name", "borrowed account", "fake id",
+    "no uniform", "wrong uniform", "unmarked vehicle", "refused to show badge", "no id",
+    "expired", "scam", "asked for more money", "extortion", "blackmail", "bribe", "cash only",
+    "refused to use app", "payment outside app", "forged", "unauthorized", "suspicious"
+  ],
+  "substance_and_impairment": [
+    "drunk", "alcohol", "smelled like booze", "high", "drugs", "weed", "marijuana",
+    "slurring", "stumbling", "erratic", "unsteady", "glassy eyes", "out of it", "nodding off",
+    "incoherent", "mumbling", "twitching", "smell", "odor", "reeked"
+  ]
+}

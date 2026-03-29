@@ -33,28 +33,39 @@
                 <input name="username" placeholder="Choose Unique Username" required>
                 <input type="password" name="password" placeholder="Create Password" required>
                 <select name="role" id="roleSelect" onchange="showWorkerOptions()">
-                    <option value="client">I am a Client (Woman)</option>
+                    <option value="client">I am a Client</option>
                     <option value="worker">I am a Service Worker</option>
                 </select>
+                
+                <div id="client-opt">
+                    <input name="house_code" placeholder="Family Invite Code (Optional)" style="border-color: var(--pink);">
+                    <p style="font-size: 11px; color: var(--text-muted); margin-top: -10px; margin-bottom: 15px;">Leave blank to create a new household.</p>
+                </div>
+
                 <div id="worker-opt" class="hidden">
                     <input name="category" placeholder="Service (Uber, Delivery, etc.)">
                 </div>
+                
                 <button type="submit" class="btn-pink">Register Account</button>
             </form>
             <p style="text-align: center; font-size: 14px; color: var(--text-muted); margin-top: 25px;">
                 Have an account? <a href="javascript:void(0)" onclick="toggle()" style="color: var(--pink); font-weight: 600;">Log In</a>
             </p>
         </div>
-    </div>
+        
+        </div>
 
     <script>
         function toggle() {
             document.getElementById('login-box').classList.toggle('hidden');
             document.getElementById('signup-box').classList.toggle('hidden');
         }
+        
         function showWorkerOptions() {
             const role = document.getElementById('roleSelect').value;
+            // Toggle visibility based on the selected role
             document.getElementById('worker-opt').className = role === 'worker' ? '' : 'hidden';
+            document.getElementById('client-opt').className = role === 'client' ? '' : 'hidden';
         }
     </script>
 </body>
