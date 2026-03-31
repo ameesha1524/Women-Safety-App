@@ -2,57 +2,181 @@
 <html>
 <head>
     <link rel="stylesheet" href="/static/style.css">
-    <title>Active Task | Shield</title>
+    <title>Active Task | Shield Security</title>
     <style>
+        :root {
+            --pink: #ec4899;
+            --green: #10b981;
+            --red: #ef4444;
+            --border: rgba(255, 255, 255, 0.1);
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            background: #0f172a;
+            font-family: 'Inter', sans-serif;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            padding: 30px;
+            border-radius: 24px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+        }
+
         .status-container {
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid var(--border);
             padding: 20px;
             border-radius: 16px;
             margin-bottom: 20px;
-            text-align: left;
         }
+
+        .qr-wrapper {
+            display: flex;
+            justify-content: center;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            margin: 15px 0;
+            transition: all 0.3s ease;
+        }
+
+        .timer-container {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            width: 100%;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .timer-bar {
+            height: 100%;
+            background: var(--pink);
+            width: 100%;
+            transition: width 1s linear;
+        }
+
+        .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
         .locked-text {
-            font-family: 'Courier New', Courier, monospace;
-            letter-spacing: 2px;
+            font-family: 'Courier New', monospace;
             color: var(--text-muted);
+            letter-spacing: 2px;
         }
+
         .reveal-glow {
-            color: #10b981;
-            text-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+            color: var(--green);
+            text-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
             font-weight: 800;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: white;
+            padding: 12px;
+            width: 100%;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-top: 10px;
         }
     </style>
 </head>
 <body>
-    <div class="glass-card" style="text-align: center;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <span class="badge" id="status-badge" style="background: rgba(239, 68, 68, 0.1); color: var(--red);">NAVIGATING</span>
-            <span style="font-size: 12px; color: var(--text-muted);" id="distance-text">Calculating...</span>
+    <div class="glass-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+            <span id="status-badge" class="badge" style="background: rgba(239, 68, 68, 0.1); color: var(--red);">NAVIGATING</span>
+            <span id="distance-text" style="font-size: 11px; color: var(--text-muted);">Syncing GPS...</span>
         </div>
 
-        <h2 style="margin: 0 0 10px 0;">Active Service Task</h2>
-        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 30px;">Stealth Handoff Protocol is ACTIVE.</p>
+        <h2 style="margin: 0 0 5px 0;">Active Task</h2>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">Identity Verification Required at Entry.</p>
+
+        <div class="status-container" style="border-color: var(--pink); background: rgba(236, 72, 153, 0.04);">
+            <p style="font-size: 11px; color: var(--pink); font-weight: bold; margin: 0;">SECURE IDENTITY QR</p>
+            
+            <div class="qr-wrapper">
+                <div id="qrcode"></div> </div>
+
+            <div class="timer-container">
+                <div id="timer-bar" class="timer-bar"></div>
+            </div>
+            <p style="font-size: 10px; color: var(--text-muted); margin-top: 10px;">Token refreshes every 30s for anti-impersonation.</p>
+        </div>
 
         <div class="status-container">
             <p style="font-size: 11px; color: var(--text-muted); margin: 0;">DESTINATION ADDRESS</p>
-            <h3 id="address-display" class="locked-text">LOCKED: REACH ZONE</h3>
-        </div>
-
-        <div class="status-container">
-            <p style="font-size: 11px; color: var(--text-muted); margin: 0;">SECURE ENTRY CODE</p>
-            <h3 id="code-display" class="locked-text">****</h3>
-        </div>
-
-        <div id="navigation-msg" style="font-size: 12px; color: var(--pink); margin-bottom: 25px;">
-            Please move toward the Koramangala drop-off zone.
+            <h3 id="address-display" class="locked-text">LOCKED: ZONE PROTECTION</h3>
+            <p id="navigation-msg" style="font-size: 11px; color: var(--pink); margin-top: 10px;">Move closer to the target zone to unlock address.</p>
         </div>
 
         <button onclick="window.location.href='/profile'" class="btn-outline">Return to Profile</button>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script>
-        function updateWorkerTask() {
+        let timeLeft = 60;
+        let qrElement = document.getElementById("qrcode");
+        let timerBar = document.getElementById("timer-bar");
+
+        // --- 1. DYNAMIC QR GENERATOR ---
+        async function refreshIdentityQR() {
+            try {
+                const response = await fetch('/api/v1/generate_token');
+                const data = await response.json();
+                
+                if (data.token) {
+                    // Clear the old QR Code
+                    qrElement.innerHTML = "";
+                    
+                    // Generate new QR containing SID and the Secure Token
+                    new QRCode(qrElement, {
+                        text: JSON.stringify({ sid: data.sid, token: data.token }),
+                        width: 160,
+                        height: 160,
+                        colorDark : "#000000",
+                        colorLight : "#ffffff",
+                        correctLevel : QRCode.CorrectLevel.H
+                    });
+                    
+                    timeLeft = 60; // Reset the 30s window
+                }
+            } catch (err) {
+                console.error("Failed to sync identity token.");
+            }
+        }
+
+        // Timer Visual Update
+        setInterval(() => {
+            timeLeft--;
+            const percentage = (timeLeft / 60) * 100;
+            timerBar.style.width = percentage + "%";
+            
+            if (timeLeft <= 0) {
+                refreshIdentityQR();
+            }
+        }, 1000);
+
+        // --- 2. STEALTH HANDOFF (GEOLOCATION) ---
+        function updateLocationStatus() {
             if (!navigator.geolocation) return;
 
             navigator.geolocation.getCurrentPosition(function(position) {
@@ -69,30 +193,32 @@
                 .then(r => r.json())
                 .then(data => {
                     const addr = document.getElementById('address-display');
-                    const code = document.getElementById('code-display');
                     const badge = document.getElementById('status-badge');
                     const msg = document.getElementById('navigation-msg');
-                    const dist = document.getElementById('distance-text');
+                    const distText = document.getElementById('distance-text');
 
-                    dist.innerText = data.message.split(' (')[1]?.replace(')', '') || "Calculating...";
+                    // Update UI with distance and status
+                    distText.innerText = data.message.includes('(') ? data.message.split('(')[1].replace(')', '') : "In Zone";
                     msg.innerText = data.message;
 
                     if (data.status === "UNLOCKED") {
                         addr.innerText = data.address;
                         addr.className = "reveal-glow";
-                        code.innerText = data.entry_code;
-                        code.className = "reveal-glow";
                         badge.innerText = "ARRIVED";
                         badge.style.background = "rgba(16, 185, 129, 0.1)";
                         badge.style.color = "var(--green)";
+                        msg.style.color = "var(--green)";
                     }
                 });
             });
         }
 
-        // Poll the server every 5 seconds to track movement
-        setInterval(updateWorkerTask, 5000);
-        updateWorkerTask(); // Initial call
+        // Initial Execution
+        refreshIdentityQR();
+        updateLocationStatus();
+
+        // Continuous Polling
+        setInterval(updateLocationStatus, 5000); // Check GPS every 5s
     </script>
 </body>
 </html>

@@ -6,12 +6,41 @@
     
     <div style="display: flex; flex-direction: column; gap: 30px;">
         
+        <div class="glass-card" style="border-top: 4px solid var(--pink);">
+            <h3 style="margin-top: 0; display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">🔍</span> Identity Verification
+            </h3>
+            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 15px;">
+                Scan the worker's Live QR code to cryptographically confirm their identity.
+            </p>
+
+            <div id="reader" style="width: 100%; border-radius: 12px; overflow: hidden; background: #000; margin-bottom: 15px; border: 1px solid var(--border);"></div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button onclick="startScanner()" id="scan-btn" class="btn-pink" style="flex: 1;">Open QR Scanner</button>
+                <button onclick="stopScanner()" id="stop-btn" class="btn-outline" style="flex: 1; display: none;">Close Camera</button>
+            </div>
+
+            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed var(--border);">
+                <details>
+                    <summary style="font-size: 11px; color: var(--text-muted); cursor: pointer;">Manual Entry Backup</summary>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <input id="vid" placeholder="ID (SH-XXXX)" style="flex: 1; margin:0;">
+                        <input id="vtoken" placeholder="6-Digit Token" maxlength="6" style="flex: 1; margin:0; text-align: center;">
+                        <button onclick="verifyWorkerManual()" class="btn-pink" style="width: 80px;">Verify</button>
+                    </div>
+                </details>
+            </div>
+
+            <div id="v-res" style="display:none; margin-top:15px; padding:15px; border-radius:12px; border:1px solid var(--border); transition: all 0.3s ease;"></div>
+        </div>
+
         <div class="glass-card" style="border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.02);">
             <h3 style="margin:0 0 15px 0; color: #ef4444; display: flex; align-items: center; gap: 10px;">
                 <span style="font-size: 20px;">🛡️</span> Dead Man's Switch
             </h3>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px;">
-                If this timer hits zero without a "Safe" check-in, your household receives an SOS alert.
+            <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 20px;">
+                Set a safety timer. If you don't check in, an SOS alert is sent to your household.
             </p>
             <div style="display: flex; gap: 10px;">
                 <select id="timer-mins" style="flex: 1; margin:0;">
@@ -25,30 +54,17 @@
         </div>
 
         <div class="glass-card">
-            <h3 style="margin-top: 0;">Identity Verification</h3>
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <input id="vid" placeholder="Enter SH-XXXX" style="flex:1; margin:0;">
-                <button onclick="verifyWorker()" class="btn-pink" style="width: 150px;">Scan Node</button>
-            </div>
-            <div id="v-res" style="display:none; padding: 15px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 12px;"></div>
-        </div>
-
-        <div class="glass-card">
             <h3 style="margin-top: 0;">Report Incident / Review</h3>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Submit reports to update the global Safety Radar and AI risk scores.</p>
-            
-            <input id="rsid" placeholder="Worker Shield ID (e.g., SH-1234)">
-            
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">AI scans reviews for red flags to update risk scores.</p>
+            <input id="rsid" placeholder="Worker Shield ID (SH-XXXX)">
             <select id="rstar">
-                <option value="5">⭐⭐⭐⭐⭐ Professional / Safe</option>
-                <option value="4">⭐⭐⭐⭐ Good Experience</option>
-                <option value="3">⭐⭐⭐ Neutral / Average</option>
-                <option value="2">⭐⭐ Suspicious Behavior</option>
-                <option value="1">⭐ High Risk / Dangerous</option>
+                <option value="5">⭐⭐⭐⭐⭐ Professional</option>
+                <option value="4">⭐⭐⭐⭐ Good</option>
+                <option value="3">⭐⭐⭐ Neutral</option>
+                <option value="2">⭐⭐ Suspicious</option>
+                <option value="1">⭐ High Risk</option>
             </select>
-
-            <textarea id="rrev" rows="3" placeholder="Describe the behavior... (AI scans for red flags)"></textarea>
-            
+            <textarea id="rrev" rows="3" placeholder="Describe behavior..."></textarea>
             <button id="rate-btn" onclick="submitReport()" class="btn-pink">Submit to Shield Network</button>
         </div>
     </div>
@@ -77,66 +93,112 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://unpkg.com/html5-qrcode"></script>
+
 <script>
-    // --- WORKER VERIFICATION ---
-    function verifyWorker() {
-        const id = document.getElementById('vid').value;
-        const resDiv = document.getElementById('v-res');
-        fetch('/verify/' + id)
-        .then(r => r.json())
-        .then(data => {
-            resDiv.style.display = 'block';
-            if (data.exists) {
-                resDiv.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: start;">
-                        <div><h4 style="margin:0;">${data.name}</h4><p style="font-size: 11px; color: var(--text-muted);">${data.category}</p></div>
-                        <div class="badge ${data.status === 'High Risk' ? 'risk-high' : 'risk-safe'}">${data.status}</div>
-                    </div>
-                    <div style="margin-top: 10px; font-weight: 800; color: #fbbf24;">⭐ ${data.rating} / 5.0</div>
-                `;
-            } else {
-                resDiv.innerHTML = `<p style="color: var(--red); margin:0; font-weight: 700;">ID NOT FOUND</p>`;
+    let scanner = null;
+
+    // --- 1. QR SCANNER LOGIC ---
+    function startScanner() {
+        document.getElementById('scan-btn').style.display = 'none';
+        document.getElementById('stop-btn').style.display = 'block';
+        
+        scanner = new Html5Qrcode("reader");
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+        scanner.start({ facingMode: "environment" }, config, (decodedText) => {
+            try {
+                // The worker's QR sends a JSON string: {"sid": "...", "token": "..."}
+                const data = JSON.parse(decodedText);
+                executeVerification(data.sid, data.token);
+                stopScanner();
+            } catch (e) {
+                alert("Invalid Shield QR Code format.");
             }
         });
     }
 
-    // --- SUBMIT RISK REPORT ---
+    function stopScanner() {
+        if (scanner) {
+            scanner.stop().then(() => {
+                document.getElementById('scan-btn').style.display = 'block';
+                document.getElementById('stop-btn').style.display = 'none';
+            });
+        }
+    }
+
+    // Manual Entry Trigger
+    function verifyWorkerManual() {
+        const id = document.getElementById('vid').value;
+        const token = document.getElementById('vtoken').value;
+        executeVerification(id, token);
+    }
+
+    // Core Verification Function
+    function executeVerification(sid, token) {
+        const resDiv = document.getElementById('v-res');
+        resDiv.style.display = 'block';
+        resDiv.innerHTML = "Authenticating Node...";
+
+        fetch('/api/v1/verify_token', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ sid: sid, token: token })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'VERIFIED') {
+                resDiv.style.borderColor = (data.safety === 'High Risk') ? '#ef4444' : '#10b981';
+                resDiv.innerHTML = `
+                    <div style="display: flex; justify-content: space-between;">
+                        <div>
+                            <h4 style="margin:0;">${data.name}</h4>
+                            <p style="font-size: 11px; color: var(--text-muted);">${data.category}</p>
+                        </div>
+                        <div class="badge ${data.safety === 'High Risk' ? 'risk-high' : 'risk-safe'}">${data.safety}</div>
+                    </div>
+                    <div style="margin-top: 10px; font-weight: 800; color: #fbbf24;">⭐ ${data.avg_rating} / 5.0</div>
+                    <p style="font-size: 10px; color: #10b981; margin-top: 5px;">✔ Authenticity Cryptographically Verified</p>
+                `;
+            } else {
+                resDiv.style.borderColor = '#ef4444';
+                resDiv.innerHTML = `<p style="color:#ef4444; margin:0; font-weight:700;">⚠️ ${data.message}</p>`;
+            }
+        });
+    }
+
+    // --- 2. INCIDENT REPORTING ---
     function submitReport() {
-        const btn = document.getElementById('rate-btn');
         const sid = document.getElementById('rsid').value;
         const rating = document.getElementById('rstar').value;
         const review = document.getElementById('rrev').value;
 
         if(!sid || !review) return alert("Please fill all fields.");
-        
-        btn.innerText = "Analyzing Risk...";
-        btn.disabled = true;
 
-        // Get GPS for the Safety Radar Map
         navigator.geolocation.getCurrentPosition((pos) => {
-            const payload = {
-                sid: sid,
-                rating: rating,
-                review: review,
-                lat: pos.coords.latitude,
-                lng: pos.coords.longitude
-            };
-
             fetch('/rate', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
-            })
-            .then(r => r.json())
-            .then(data => {
-                alert(data.message);
-                location.reload(); // Refresh to update House Feed
-            });
-        }, (err) => {
-            alert("GPS required for Safety Radar mapping. Please enable location.");
-            btn.disabled = false;
-            btn.innerText = "Submit to Shield Network";
+                body: JSON.stringify({
+                    sid: sid, rating: rating, review: review,
+                    lat: pos.coords.latitude, lng: pos.coords.longitude
+                })
+            }).then(() => location.reload());
         });
+    }
+
+    // --- 3. SAFETY TIMER ---
+    function startSafetyTimer() {
+        const mins = document.getElementById('timer-mins').value;
+        fetch('/api/v1/start_timer', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({minutes: mins})
+        }).then(() => alert("SOS Timer Active."));
+    }
+
+    function stopSafetyTimer() {
+        fetch('/api/v1/stop_timer', { method: 'POST' }).then(() => alert("Timer Stopped."));
     }
 </script>
 {% endblock %}

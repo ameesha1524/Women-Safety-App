@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, session, jsonify
-import sqlite3, random, string, json, math
+import sqlite3, random, string, json, math, pyotp
 from textblob import TextBlob
 from datetime import datetime
 
@@ -14,13 +14,13 @@ try:
 except FileNotFoundError:
     RED_FLAGS = ["uncomfortable", "aggressive", "creepy", "fake id"]
 
-# --- MATH: HAVERSINE FORMULA (Distance Calculation) ---
+# --- MATH: HAVERSINE FORMULA ---
 def calculate_distance(lat1, lon1, lat2, lon2):
     lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
     dlon, dlat = lon2 - lon1, lat2 - lat1
     a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
     c = 2 * math.asin(math.sqrt(a))
-    return c * 6371 # Returns distance in KM
+    return c * 6371 
 
 def analyze_risk(review_text, stars):
     review_text = review_text.lower()
@@ -33,7 +33,9 @@ def analyze_risk(review_text, stars):
 def init_db():
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
-    c.execute('CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT, role TEXT, shield_id TEXT, category TEXT, house_code TEXT)')
+    c.execute('''CREATE TABLE IF NOT EXISTS users 
+                 (username TEXT PRIMARY KEY, password TEXT, role TEXT, 
+                  shield_id TEXT, category TEXT, house_code TEXT, otp_secret TEXT)''')
     c.execute('CREATE TABLE IF NOT EXISTS ratings (helper_id TEXT, username TEXT, rating INTEGER, review TEXT, risk_status TEXT, latitude REAL, longitude REAL)')
     c.execute('CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, house_code TEXT, message TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)')
     c.execute('CREATE TABLE IF NOT EXISTS sessions (username TEXT, house_code TEXT, end_time DATETIME, status TEXT)')
@@ -42,33 +44,99 @@ def init_db():
 
 init_db()
 
+# --- NEW: HOUSEHOLD & MAP ROUTES (Fixes 404 Errors) ---
+
+@app.route('/household')
+def household():
+    if 'user' not in session: return redirect('/')
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    # Fetch all members sharing the same house code
+    c.execute("SELECT username, role FROM users WHERE house_code=?", (session['house_code'],))
+    members = c.fetchall()
+    conn.close()
+    return render_template('household.html', members=members, house_code=session['house_code'])
+
+@app.route('/map')
+def map_page():
+    if session.get('role') != 'client': return redirect('/')
+    return render_template('map.html')
+
+@app.route('/api/v1/community_map')
+def community_map():
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    c.execute("SELECT latitude, longitude, risk_status FROM ratings WHERE latitude != 0")
+    data = c.fetchall()
+    conn.close()
+    return jsonify([[r[0], r[1], (1.0 if r[2] == 'High Risk' else 0.2)] for r in data])
+
+# --- DYNAMIC TOKEN APIs ---
+
+@app.route('/api/v1/generate_token')
+def generate_token():
+    if session.get('role') != 'worker': return jsonify({"error": "Unauthorized"}), 403
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    c.execute("SELECT otp_secret FROM users WHERE username=?", (session['user'],))
+    res = c.fetchone()
+    conn.close()
+    if not res: return jsonify({"error": "User not found"}), 404
+    totp = pyotp.TOTP(res[0], interval=60)
+    return jsonify({"token": totp.now(), "sid": session['sid']})
+
+@app.route('/api/v1/verify_token', methods=['POST'])
+def verify_token():
+    d = request.json
+    sid = d.get('sid', '').upper().strip()
+    token = d.get('token', '').strip()
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    c.execute("SELECT otp_secret, username, category FROM users WHERE shield_id=?", (sid,))
+    worker = c.fetchone()
+    if not worker:
+        conn.close()
+        return jsonify({"status": "REJECTED", "message": "Invalid Shield ID"}), 404
+    totp = pyotp.TOTP(worker[0], interval=60)
+    if not totp.verify(token):
+        conn.close()
+        return jsonify({"status": "REJECTED", "message": "Token Expired/Invalid (Impersonation Risk)"}), 403
+    c.execute("SELECT rating, risk_status FROM ratings WHERE helper_id=?", (sid,))
+    revs = c.fetchall()
+    conn.close()
+    avg = round(sum([r[0] for r in revs])/len(revs), 1) if revs else 0.0
+    is_high_risk = any(r[1] == "High Risk" for r in revs)
+    return jsonify({
+        "status": "VERIFIED",
+        "name": worker[1].capitalize(),
+        "category": worker[2],
+        "safety": "High Risk" if is_high_risk else "Verified Safe",
+        "avg_rating": avg
+    })
+
 # --- AUTHENTICATION ROUTES ---
+
 @app.route('/')
 def index():
     return render_template('index.html', mode="login")
 
-@app.route('/signup_page')
-def signup_page():
-    return render_template('index.html', mode="signup")
-
 @app.route('/signup', methods=['POST'])
 def signup():
-    u = request.form.get('username').lower().strip()
+    u = request.form.get('username', '').lower().strip()
     p = request.form.get('password')
     r = request.form.get('role')
     cat = request.form.get('category', 'N/A')
     h = request.form.get('house_code', '').upper().strip()
-    
+    otp_secret = pyotp.random_base32()
     if r == 'client' and not h:
         h = "FAM-" + "".join(random.choices(string.ascii_uppercase, k=4))
-
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
     try:
         sid = "SH-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=4)) if r == 'worker' else None
-        c.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?)", (u, p, r, sid, cat, h))
+        c.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?)", (u, p, r, sid, cat, h, otp_secret))
         conn.commit()
-        return render_template('index.html', success="Account Created! Please Login.", mode="login")
+        return render_template('index.html', success="Account Created!", mode="login")
     except sqlite3.IntegrityError:
         return render_template('index.html', error="Username taken!", mode="signup")
     finally:
@@ -76,7 +144,7 @@ def signup():
 
 @app.route('/login', methods=['POST'])
 def login():
-    u, p = request.form.get('username').lower().strip(), request.form.get('password')
+    u, p = request.form.get('username', '').lower().strip(), request.form.get('password')
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE username=? AND password=?", (u, p))
@@ -87,7 +155,7 @@ def login():
         return redirect('/profile' if user[2] == 'worker' else '/dashboard')
     return render_template('index.html', error="Invalid Login.", mode="login")
 
-# --- CLIENT & HOUSEHOLD ROUTES ---
+# --- DASHBOARD & PROFILE ---
 @app.route('/dashboard')
 def dashboard():
     if session.get('role') != 'client': return redirect('/')
@@ -98,22 +166,6 @@ def dashboard():
     conn.close()
     return render_template('dashboard.html', house_code=session['house_code'], logs=logs)
 
-@app.route('/household')
-def household():
-    if 'user' not in session: return redirect('/')
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    c.execute("SELECT username FROM users WHERE house_code=?", (session['house_code'],))
-    members = [r[0] for r in c.fetchall()]
-    conn.close()
-    return render_template('household.html', members=members, house_code=session['house_code'])
-
-@app.route('/map')
-def map_page():
-    if session.get('role') != 'client': return redirect('/')
-    return render_template('map.html')
-
-# --- WORKER ROUTES ---
 @app.route('/profile')
 def profile():
     if session.get('role') != 'worker': return redirect('/')
@@ -123,15 +175,8 @@ def profile():
     revs = c.fetchall()
     total = len(revs)
     avg = round(sum([r[0] for r in revs])/total, 1) if total else 0
-    # Certification Logic: 50+ jobs, 4.5+ avg, 0 high risk flags
-    certified = total >= 50 and avg >= 4.5 and not any(r[2] == "High Risk" for r in revs)
     conn.close()
-    return render_template('profile.html', sid=session['sid'], cat=session['cat'], reviews=revs, avg=avg, total=total, certified=certified)
-
-@app.route('/worker/task')
-def worker_task():
-    if session.get('role') != 'worker': return redirect('/')
-    return render_template('worker_task.html')
+    return render_template('profile.html', sid=session['sid'], cat=session['cat'], reviews=revs, avg=avg, total=total)
 
 # --- DEAD MAN'S SWITCH APIs ---
 @app.route('/api/v1/start_timer', methods=['POST'])
@@ -153,46 +198,20 @@ def stop_timer():
     conn.commit()
     return jsonify({"status": "Stopped"})
 
-@app.route('/api/v1/check_sos')
-def check_sos():
-    if 'user' not in session: return jsonify({"sos_active": False})
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    c.execute("SELECT username FROM sessions WHERE house_code=? AND end_time < datetime('now', 'localtime') AND username != ?", (session['house_code'], session['user']))
-    victims = [r[0] for r in c.fetchall()]
-    return jsonify({"sos_active": len(victims) > 0, "victims": victims})
+# --- WORKER SAFETY & STEALTH HANDOFF ---
+@app.route('/worker/task')
+def worker_task():
+    if session.get('role') != 'worker': return redirect('/')
+    return render_template('worker_task.html')
 
-# --- WORKER SAFETY & STEALTH HANDOFF API ---
 @app.route('/api/v1/secure_delivery_info', methods=['POST'])
 def secure_info():
     d = request.json
-    # Stealth Handoff: Locked until within 50m of Client (Fixed target for demo)
     dist = calculate_distance(d['worker_lat'], d['worker_lng'], 12.9716, 79.1594)
-    
-    # REVERSE INTEL: Calculate Household Risk
-    target_house = "FAM-PQRS" # In production, pull from active task
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    c.execute("SELECT risk_status FROM ratings WHERE username IN (SELECT username FROM users WHERE house_code=?)", (target_house,))
-    hist = c.fetchall()
-    high_risks = sum(1 for r in hist if r[0] == 'High Risk')
-    risk_score = "CRITICAL" if high_risks > 1 else ("ELEVATED" if high_risks == 1 else "SAFE")
-    
     if dist <= 0.05:
-        return jsonify({
-            "status": "UNLOCKED", 
-            "address": "Apartment 402, Block B, Tulip Heights", 
-            "house_risk": risk_score,
-            "message": "Arrived. Precise data revealed."
-        })
-    return jsonify({
-        "status": "LOCKED", 
-        "address": "Vellore Sector 1", 
-        "house_risk": "HIDDEN", 
-        "message": f"Too far ({round(dist, 2)}km). Move closer to unlock intel."
-    })
+        return jsonify({"status": "UNLOCKED", "address": "Apartment 402, Block B, Tulip Heights", "entry_code": "9921", "message": "Arrived. Precise data revealed."})
+    return jsonify({"status": "LOCKED", "address": "REDACTED", "message": f"Too far ({round(dist, 2)}km). Move closer."})
 
-# --- UTILITY ROUTES ---
 @app.route('/rate', methods=['POST'])
 def rate():
     d = request.json
@@ -204,14 +223,6 @@ def rate():
     conn.commit()
     conn.close()
     return jsonify({"message": f"Logged. AI Result: {risk}"})
-
-@app.route('/api/v1/community_map')
-def community_map():
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    c.execute("SELECT latitude, longitude, risk_status FROM ratings WHERE latitude != 0")
-    data = c.fetchall()
-    return jsonify([[r[0], r[1], (1.0 if r[2] == 'High Risk' else 0.2)] for r in data])
 
 @app.route('/logout')
 def logout():
